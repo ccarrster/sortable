@@ -54,6 +54,36 @@ function cleanTitle($title){
 	return $result;
 }
 
+function getProductMatchLength($split_product, $listing){
+	$total_match_length = 0;
+	$truncated_listing = $listing;
+	foreach($split_product as $product_part){
+		$position = stripos($truncated_listing, $product_part);
+		if($position !== false){
+			$part_length = strlen($product_part);
+			$total_match_length += $part_length;
+			$truncated_listing = substr($truncated_listing, $position + $part_length);
+		} else {
+			return 0;
+		}
+	}
+	return $total_match_length;
+}
+
+function matchListing($listing, $product_names){
+	$best_match = null;
+	$best_match_length = 0;
+	$short_listing = cleanTitle($listing->title);
+	foreach($product_names as $product_name => $split_product){
+		$match_length = getProductMatchLength($split_product, $short_listing);
+		if($match_length > $best_match_length){
+			$best_match_length = $match_length;
+			$best_match = $product_name;
+		}
+	}
+	return $best_match;
+}
+
 if(count($argv) == 4){
 
 	$products = loadJsonFile($argv[1]);
@@ -61,41 +91,13 @@ if(count($argv) == 4){
 	$output_file_name = $argv[3];
 
 	$result = initializeResult($products);
-	$clean_product_names = splitProducts($products);
-
+	$product_names = splitProducts($products);
 	foreach($listings as $listing){
-		$best_match = null;
-		$best_match_length = 0;
-
-		$short_listing = cleanTitle($listing->title);
-
-		foreach($clean_product_names as $product_name => $split_product){
-			$total_match_length = 0;
-			$mismatch = false;
-			$internal_short_listing = $short_listing;
-			foreach($split_product as $product_part){
-				$position = stripos($internal_short_listing, $product_part);
-				if($position !== false){
-					$part_length = strlen($product_part);
-					$total_match_length = $total_match_length + $part_length;
-					$internal_short_listing = substr($internal_short_listing, $position + $part_length);
-				} else {
-					$mismatch = true;
-					break;
-				}
-			}
-			if(!$mismatch){
-				if($total_match_length > $best_match_length){
-					$best_match_length = $total_match_length;
-					$best_match = $product_name;
-				}
-			}
-		}
-		if($best_match != null){
-			$result[$best_match][] = $listing;
+		$match = matchListing($listing, $product_names);
+		if($match != null){
+			$result[$match][] = $listing;
 		}
 	}
-
 	writeOutput($result, $output_file_name);
 } else {
 	echo("Invalid Command line arguments. Usage: php product_matcher.php productfile listingsfile outputfile");
